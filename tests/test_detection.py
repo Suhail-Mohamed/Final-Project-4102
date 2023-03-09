@@ -4,8 +4,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from fer import FER
 import cv2
 
-files = ["../images/happy_lebron.jpg", "../images/another_happy_lebron.jpg", "../images/willy_wonka_smiling.jpg",
-         "../images/sparta_angry.jpg"]
+files = ["../images/happy_lebron.jpg", "../images/another_happy_lebron.jpg", "../images/willy_wonka_smiling.jpg", "../images/sparta_angry.jpg"]
+
 
 detector = FER()
 
