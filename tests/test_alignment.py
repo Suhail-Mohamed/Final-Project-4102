@@ -1,6 +1,6 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import numpy as np
+
 from fer import FER
 from imutils import face_utils
 
@@ -78,70 +78,30 @@ maskless, masked = input_images("../images/maskless_dude.jpg", "../images/masked
 # cv2.imshow('Masked', masked)
 
 #find_land_marks(masked)
-masked_input = io.imread('../images/lebron_masked.jpg')
-maskless_input = io.imread('../images/lebron_maskless.jpg')
-
+input = io.imread('../images/lebron_masked.jpg')
+inputRotated = io.imread('../images/lebron_maskless.jpg')
 #masked_image = cv2.imread("../images/masked_dude.jpg"  , cv2.COLOR_BGR2GRAY)
-masked_landmarks = fa.get_landmarks(masked_input)
-maskless_landmarks = fa.get_landmarks(maskless_input)
-
-print(len(masked_landmarks[0]))
-count = 1
-
-hull = []
-face_landmark_mask_size = 69
-
-mask_dst_pts = []
-maskless_src_pts = []
-
-for (x, y) in masked_landmarks[0]:
-    if ((count >= 18 and count <= 27) or (count >= 37 and count <= 48)):
-        mask_dst_pts.append([int(x), int(y)])
-        cv2.circle(masked_input, (int(x), int(y)), 2, (255, 0, 0), -1)
+preds = fa.get_landmarks(input)
+preds_rotated = fa.get_landmarks(inputRotated)
+print(len(preds[0]))
+count = 0
+for (x, y) in preds[0]:
+    #print(x)
+    if count < 4 or (count > 20 and count < 40):
+        cv2.circle(input, (int(x), int(y)), 2, (255, 0, 0), -1)
     count = count + 1
 
-count = 1
-for (x, y) in maskless_landmarks[0]:
-    if((count >= 18 and count <= 27) or (count >= 37 and count <= 48)):
-        maskless_src_pts.append([int(x), int(y)])
-        cv2.circle(maskless_input, (int(x), int(y)), 2, (255, 0, 0), -1)
+count = 0
+for (x, y) in preds_rotated[0]:
+    if count < 4 or (count > 20 and count < 40):
+        cv2.circle(inputRotated, (int(x), int(y)), 2, (255, 0, 0), -1)
     count = count + 1
 
-M, mask_useless = cv2.findHomography(np.array(maskless_src_pts), np.array(mask_dst_pts), cv2.RANSAC, 5.0)
-warped = cv2.warpPerspective(maskless_input, M, (masked_input.shape[1], masked_input.shape[0]))
 
-print(np.float32(maskless_landmarks[0]))
+print("dine")
+cv2.imshow('Normal', input)
+cv2.imshow('Rotated', inputRotated)
 
-maskless_transformed = cv2.perspectiveTransform(np.array([maskless_landmarks[0]]), M)
-print(maskless_transformed)
-
-count = 1
-for (x, y) in maskless_transformed[0]:
-    print(x, " - " ,y)
-    if (count >= 1 and count <= 17): 
-        print(type(maskless_transformed[0][count]))
-        hull.append(cv2.convexHull(np.array([maskless_transformed[0][count]]), False))
-    count = count + 1
-hull.append(cv2.convexHull(np.array([maskless_transformed[0][29]]), False))
-
-print (hull)
-# create an empty black image
-# drawing = np.zeros((maskless_input.shape[0], maskless_input.shape[1], 3), np.uint8)
- 
-# # draw contours and hull points
-# for i in range(len(hull)):
-#     color_contours = (0, 255, 0) # green - color for contours
-#     color = (255, 0, 0) # blue - color for convex hull
-#     # 87draw ith contour
-#     # cv2.drawContours(drawing, contours, i, color_contours, 1, 8, hierarchy)
-#     # draw ith convex hull object
-#     # cv2.drawContours(drawing, hull, i, color, 1, 8)
-
-
-print("Done ")
-cv2.imshow('Normal', masked_input)
-cv2.imshow('Rotated', maskless_input)
-cv2.imshow('Warped', warped)
 
 
 cv2.waitKey(0)
