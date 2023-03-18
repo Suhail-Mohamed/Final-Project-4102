@@ -86,81 +86,76 @@ masked_landmarks = fa.get_landmarks(masked_input)
 maskless_landmarks = fa.get_landmarks(maskless_input)
 
 print(len(masked_landmarks[0]))
+count = 1
 
-hull_list = []
+hull = []
 face_landmark_mask_size = 69
 
 mask_dst_pts = []
 maskless_src_pts = []
 
-count = 1
+maskless_nose_point = []
+maskless_chin_point = []
+
+
 for (x, y) in masked_landmarks[0]:
-    cv2.circle(masked_input, (int(x), int(y)), 2, (255, 0, 0), -1)
     if ((count >= 18 and count <= 27) or (count >= 37 and count <= 48)):
         mask_dst_pts.append([int(x), int(y)])
+        cv2.circle(masked_input, (int(x), int(y)), 2, (255, 0, 0), -1)
     count = count + 1
 
 count = 1
 for (x, y) in maskless_landmarks[0]:
-    cv2.circle(maskless_input, (int(x), int(y)), 2, (255, 0, 0), -1)
     if((count >= 18 and count <= 27) or (count >= 37 and count <= 48)):
         maskless_src_pts.append([int(x), int(y)])
+        cv2.circle(maskless_input, (int(x), int(y)), 2, (255, 0, 0), -1)
+    if count == 9:
+        maskless_chin_point.append([int(x), int(y)])
+        cv2.circle(maskless_input, (int(x), int(y)), 2, (255, 0, 0), -1)
+    if count == 31:
+        maskless_nose_point.append([int(x), int(y)])
+        cv2.circle(maskless_input, (int(x), int(y)), 2, (255, 0, 0), -1)
     count = count + 1
 
 M, mask_useless = cv2.findHomography(np.array(maskless_src_pts), np.array(mask_dst_pts), cv2.RANSAC, 5.0)
-warped          = cv2.warpPerspective(maskless_input, M, (masked_input.shape[1], masked_input.shape[0]))
+warped = cv2.warpPerspective(maskless_input, M, (masked_input.shape[1], masked_input.shape[0]))
 
-maskless_transformed = cv2.perspectiveTransform(np.array([maskless_landmarks[0]]), M)
-print(maskless_transformed)
+chin_point_warped = cv2.perspectiveTransform(np.float32([maskless_chin_point]),M)
+nose_point_warped = cv2.perspectiveTransform(np.float32([maskless_nose_point]),M)
 
-count = 1
-for (x, y) in maskless_transformed[0]:
-    if (count >= 2 and count <= 16) or count == 28:
-        pt_draw = (int(x), int(y))
-        pt_hull = np.float32([x, y]).reshape(-1, 2)
-        print(pt_hull)
-        cv2.circle(warped, pt_draw, 2, (0, 0, 255), -1)
-        hull_list.append([x, y])
-    count = count + 1
-
-'''
-Creating mask from contour [[ 1626.   360.]
- [ 1776.  3108.]
- [  126.  3048.]
- [  330.   486.]]
- 
-def create_mask(img, cnt):
-    mask = np.zeros((img.shape[0], img.shape[1]), np.uint8)
-    print("create_mask, cnt=%s" % cnt)
-    cv2.drawContours(mask, [cnt.astype(int)], 0, (0, 255, 0), -1)
-    return mask
-'''
-
-#hull = cv2.convexHull(np.array(hull_list, dtype='float32'))
-print('PRINTING')
-print(hull_list)
-
-mask = np.zeros((warped.shape[0], warped.shape[1]), np.uint8)
-hull_list = np.array(hull_list).reshape((-1,1,2)).astype(np.int32)
-
-cv2.drawContours(masked_input, [hull_list], -1, (0, 255, 0), 2)
+print("PRINTING THE BOUNDRY OF THE POINTS")
+print(chin_point_warped[0][0])
+print(nose_point_warped[0][0])
 
 
-print("SIZES00")
-print(masked_input.shape)
-print(mask.shape)
-print(warped.shape)
+mashed_image = np.copy(masked_input)
 
-#result = cv2.bitwise_and(img2_resized, mask)
-poly_image = cv2.polylines(warped, [hull_list], True,(0, 255, 0), 2)
+for i in range (mashed_image.shape[0]):
+    for j in range (mashed_image.shape[1]):
+        if i > 130 and i < 200 and j > 50 and j < 163:
+            mashed_image[i][j] = warped[i][j]
+
+#Mash that shit together j
 
 
 
-#contours, ff = cv2.findContours(np.uint8(warped), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+# print(np.float32(maskless_landmarks[0]))
 
-# contours, hierarchy = cv2.findContours(warped, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-# Draw the contours on the original image
-# cv2.drawContours(warped, contours, -1, (0, 255, 0), 2)
+# maskless_transformed = cv2.perspectiveTransform(np.array([maskless_landmarks[0]]), M)
+# print(maskless_transformed)
+
+# count = 1
+# for (x, y) in maskless_landmarks[0]:
+#     if (count >= 1 and count <= 17):
+#         pt_draw = (int(x), int(y))
+        
+#         cv2.circle(maskless_transformed, (int), 2, (255, 0, 0), -1)
+#         print(type(maskless_transformed[0][count]))
+#         hull.append(cv2.convexHull(np.array([warped[0][count]]), False))
+#     count = count + 1
+
+# hull.append(cv2.convexHull(np.array([maskless_transformed[0][29]]), False))
+# print (hull)
 
 # create an empty black image
 # drawing = np.zeros((maskless_input.shape[0], maskless_input.shape[1], 3), np.uint8)
@@ -178,8 +173,8 @@ poly_image = cv2.polylines(warped, [hull_list], True,(0, 255, 0), 2)
 print("Done ")
 cv2.imshow('Normal', masked_input)
 cv2.imshow('Rotated', maskless_input)
-cv2.imshow('Warped' , warped)
-#cv2.imshow('Poly' , result)
+cv2.imshow('Warped', warped)
+cv2.imshow('MASHED', mashed_image)
 
 
 
