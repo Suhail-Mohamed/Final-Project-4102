@@ -11,15 +11,11 @@ import cv2
 import dlib
 
 '''
-Idea:
-    - Align eyebrow/eyes/nose-bridge
-    - Once these keypoints aligned alter non-masked face
-    - face swap these 
-
-functions:
-    determine_emotion(img) -> str
-    change_emotion(img_non_masked, emotion:str) -> void
-    face_swap(img_non-masked, img_masked) -> void
+TODO:
+    - Finding the chin (we can try)
+    - Messing around with emotions (make smile)
+    - Clean up code
+    - Write report
 '''
 predictor          = "..\model\shape_predictor_68_face_landmarks.dat"
 dlib_face_detector = dlib.get_frontal_face_detector()
@@ -78,8 +74,8 @@ maskless, masked = input_images("../images/maskless_dude.jpg", "../images/masked
 # cv2.imshow('Masked', masked)
 
 #find_land_marks(masked)
-masked_input = io.imread('../images/lebron_masked.jpg')
-maskless_input = io.imread('../images/lebron_maskless.jpg')
+masked_input = io.imread('../images/masked_dude_rotated.jpg')
+maskless_input = io.imread('../images/maskless_dude.jpg')
 
 #masked_image = cv2.imread("../images/masked_dude.jpg"  , cv2.COLOR_BGR2GRAY)
 masked_landmarks = fa.get_landmarks(masked_input)
@@ -98,12 +94,16 @@ for (x, y) in masked_landmarks[0]:
     cv2.circle(masked_input, (int(x), int(y)), 2, (255, 0, 0), -1)
     if ((count >= 18 and count <= 27) or (count >= 37 and count <= 48)):
         mask_dst_pts.append([int(x), int(y)])
+    if (count == 16  or count == 17 or count == 1 or count == 2):
+        mask_dst_pts.append([int(x), int(y)])
     count = count + 1
 
 count = 1
 for (x, y) in maskless_landmarks[0]:
     cv2.circle(maskless_input, (int(x), int(y)), 2, (255, 0, 0), -1)
     if((count >= 18 and count <= 27) or (count >= 37 and count <= 48)):
+        maskless_src_pts.append([int(x), int(y)])
+    if (count == 16  or count == 17 or count == 1 or count == 2):
         maskless_src_pts.append([int(x), int(y)])
     count = count + 1
 
