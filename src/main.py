@@ -143,8 +143,16 @@ print(hull_list)
 mask = np.zeros((warped.shape[0], warped.shape[1]), np.uint8)
 hull_list = np.array(hull_list).reshape((-1,1,2)).astype(np.int32)
 
-cv2.drawContours(masked_input, [hull_list], -1, (0, 255, 0), 2)
+hull = cv2.drawContours(mask, [hull_list], -1, 255, cv2.FILLED)
+idx  = (hull == 255)
 
+for x in range(masked_input.shape[0]):
+    for y in range(masked_input.shape[1]):
+        if idx[x][y]:
+            masked_input[x][y] = warped[x][y]
+
+
+print(idx)
 
 print("SIZES00")
 print(masked_input.shape)
@@ -179,7 +187,7 @@ print("Done ")
 cv2.imshow('Normal', masked_input)
 cv2.imshow('Rotated', maskless_input)
 cv2.imshow('Warped' , warped)
-#cv2.imshow('Poly' , result)
+#cv2.imshow('Poly' , idx)
 
 
 
