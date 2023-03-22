@@ -13,48 +13,30 @@ import dlib
 '''
 TODO:
     - Finding the chin (we can try)
-    - Messing around with emotions (make smile)
+    - Try to belend color, use mask color in the image and compare with the replaced face to ensure that there is no mask left
     - Clean up code
+    - Smoothing at the seams of the mask
     - Write report
+
 '''
+#Initalizing the models that we are going to use
+
+MASK_POINT_THRESHOLD = 5
+
 predictor          = "..\model\shape_predictor_68_face_landmarks.dat"
 dlib_face_detector = dlib.get_frontal_face_detector()
 facial_landmarks   = dlib.shape_predictor(predictor)
 
+#This is the model that allows us to get the facial landmark points of an image
 fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False)
 fer_detector = FER()
 
-def find_land_marks(face_img):  
-    print("FIND_LAND_MARKS")
-    rects = dlib_face_detector(face_img, 0)
-    print(rects)
-
-    for (i, rect) in enumerate(rects):
-        # determine the facial landmarks for the face region, then
-        # convert the facial landmark (x, y)-coordinates to a NumPy
-        # array
-        shape = facial_landmarks(face_img, rect)
-        shape = face_utils.shape_to_np(shape)
+def find_chin(maskless_transformed_landmarks):
+    x_nose, y_nose = maskless_transformed_landmarks[27]
+    x_chin, y_chin = maskless_transformed_landmarks[8]
+    vector = [x_chin - x_nose, y_chin - y_nose]    
     
-        # loop over the (x, y)-coordinates for the facial landmarks
-        # and draw them on the image
-        for (x, y) in shape:
-            cv2.circle(face_img, (x, y), 2, (255, 0, 0), -1)
-
-    cv2.imshow('GDJhbfjkdszfhkdzj', face_img)
-
-
-def triangulation_face(img):
-    
-    pass
-
-def face_swap(img_non_masked, img_masked):
-    # find land marks and do the triangulation of both images
-    pass
-
-def change_emotion(img_non_masked, emotion):
-    # Do transformations where the facial landmarks are    
-    pass
+    return vector
 
 def determine_emotion(img):
     fer_detector.detect_emotions(img)
@@ -66,19 +48,26 @@ def input_images(img_1, img_2):
     maskless_image = cv2.imread(img_1, cv2.COLOR_BGR2GRAY)  
     masked_image = cv2.imread(img_2  , cv2.COLOR_BGR2GRAY)
     masked_image_resized = cv2.resize(masked_image, (maskless_image.shape[1], maskless_image.shape[0]))
+
     return maskless_image, masked_image_resized
 
-maskless, masked = input_images("../images/maskless_dude.jpg", "../images/masked_dude.jpg")
+#maskless, masked = input_images("../images/maskless_dude.jpg", "../images/masked_dude.jpg")
 
 # cv2.imshow('Maskless', maskless)
 # cv2.imshow('Masked', masked)
-
 #find_land_marks(masked)
+
+#reading in the images 
 masked_input = io.imread('../images/masked_dude_rotated.jpg')
 maskless_input = io.imread('../images/maskless_dude.jpg')
 
+# masked_input = io.imread('../images/Biden_masked.jpg')
+# maskless_input = io.imread('../images/Biden_maskless.jpg')
+
+masked_output = np.copy(masked_input)
 #masked_image = cv2.imread("../images/masked_dude.jpg"  , cv2.COLOR_BGR2GRAY)
-masked_landmarks = fa.get_landmarks(masked_input)
+
+masked_landmarks   = fa.get_landmarks(masked_output)
 maskless_landmarks = fa.get_landmarks(maskless_input)
 
 print(len(masked_landmarks[0]))
@@ -91,7 +80,7 @@ maskless_src_pts = []
 
 count = 1
 for (x, y) in masked_landmarks[0]:
-    cv2.circle(masked_input, (int(x), int(y)), 2, (255, 0, 0), -1)
+    cv2.circle(masked_output, (int(x), int(y)), 2, (255, 0, 0), -1)
     if ((count >= 18 and count <= 27) or (count >= 37 and count <= 48)):
         mask_dst_pts.append([int(x), int(y)])
     if (count == 16  or count == 17 or count == 1 or count == 2):
@@ -108,18 +97,39 @@ for (x, y) in maskless_landmarks[0]:
     count = count + 1
 
 M, mask_useless = cv2.findHomography(np.array(maskless_src_pts), np.array(mask_dst_pts), cv2.RANSAC, 5.0)
-warped          = cv2.warpPerspective(maskless_input, M, (masked_input.shape[1], masked_input.shape[0]))
-
+warped          = cv2.warpPerspective(maskless_input, M, (masked_output.shape[1], masked_output.shape[0]))
 maskless_transformed = cv2.perspectiveTransform(np.array([maskless_landmarks[0]]), M)
-print(maskless_transformed)
+
+chin_vector  = find_chin(maskless_transformed[0])
+nose_pt_mask = maskless_transformed[0][27]
+
+print("OUTSIDE THE TRANSFORM LOOP", nose_pt_mask)
+apprx_chin   = [int(nose_pt_mask[0] + chin_vector[0] + MASK_POINT_THRESHOLD), 
+                int(nose_pt_mask[1] + chin_vector[1])]
+
+print("STARTING POINT FOR VECTOR ADDITION:", nose_pt_mask)
+cv2.circle(masked_output, (int(nose_pt_mask[0]), int(nose_pt_mask[1])), 2, (0, 255, 0), -1)
+
+print("APPROXIMATE CHIN:", apprx_chin)
+cv2.circle(masked_output, (int(apprx_chin[0]), int(apprx_chin[1])), 2, (0, 255, 0), -1)
+
+# mask_dst_pts.append(apprx_chin)
+# maskless_src_pts.append((int(maskless_landmarks[0][8][0]), int(maskless_landmarks[0][8][1])))
+
+# M, mask_useless = cv2.findHomography(np.array(maskless_src_pts), np.array(mask_dst_pts), cv2.RANSAC, 5.0)
+# warped          = cv2.warpPerspective(maskless_input, M, (masked_output.shape[1], masked_output.shape[0]))
+# maskless_transformed = cv2.perspectiveTransform(np.array([maskless_landmarks[0]]), M)
+
 
 count = 1
 for (x, y) in maskless_transformed[0]:
-    if (count >= 2 and count <= 16) or count == 28:
+    if count == 28:
         pt_draw = (int(x), int(y))
+        print("INSIDE THE TRANSFORM LOOP: ", x, y)
+        #cv2.circle(warped, pt_draw, 10, (255, 0, 255), -1)
+    if (count >= 2 and count <= 16) or count == 28:
         pt_hull = np.float32([x, y]).reshape(-1, 2)
         print(pt_hull)
-        cv2.circle(warped, pt_draw, 2, (0, 0, 255), -1)
         hull_list.append([x, y])
     count = count + 1
 
@@ -146,49 +156,33 @@ hull_list = np.array(hull_list).reshape((-1,1,2)).astype(np.int32)
 hull = cv2.drawContours(mask, [hull_list], -1, 255, cv2.FILLED)
 idx  = (hull == 255)
 
-for x in range(masked_input.shape[0]):
-    for y in range(masked_input.shape[1]):
+for x in range(masked_output.shape[0]):
+    for y in range(masked_output.shape[1]):
         if idx[x][y]:
-            masked_input[x][y] = warped[x][y]
+            masked_output[x][y] = warped[x][y]
 
 
 print(idx)
-
 print("SIZES00")
-print(masked_input.shape)
+print(masked_output.shape)
 print(mask.shape)
 print(warped.shape)
 
 #result = cv2.bitwise_and(img2_resized, mask)
 poly_image = cv2.polylines(warped, [hull_list], True,(0, 255, 0), 2)
 
+print("Code is done Running ")
 
+#Displaying the orgingal image and the results
+cv2.imshow('Orginal Masked Image', masked_input)
+cv2.imshow('Maskless Image', maskless_input)
+cv2.imshow('Warped Image' , warped)
+cv2.imshow('Masked Output - Removal' , masked_output)
 
-#contours, ff = cv2.findContours(np.uint8(warped), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-# contours, hierarchy = cv2.findContours(warped, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-# Draw the contours on the original image
-# cv2.drawContours(warped, contours, -1, (0, 255, 0), 2)
-
-# create an empty black image
-# drawing = np.zeros((maskless_input.shape[0], maskless_input.shape[1], 3), np.uint8)
- 
-# # draw contours and hull points
-# for i in range(len(hull)):
-#     color_contours = (0, 255, 0) # green - color for contours
-#     color = (255, 0, 0) # blue - color for convex hull
-#     # 87draw ith contour
-#     # cv2.drawContours(drawing, contours, i, color_contours, 1, 8, hierarchy)
-#     # draw ith convex hull object
-#     # cv2.drawContours(drawing, hull, i, color, 1, 8)
-
-
-print("Done ")
-cv2.imshow('Normal', masked_input)
-cv2.imshow('Rotated', maskless_input)
-cv2.imshow('Warped' , warped)
-#cv2.imshow('Poly' , idx)
-
+#Determining the emotions 
+print("Emotions")
+print(determine_emotion(masked_output))
+print(determine_emotion(maskless_input))
 
 
 cv2.waitKey(0)
