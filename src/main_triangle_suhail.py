@@ -1,39 +1,21 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import numpy as np
-from fer import FER
-from imutils import face_utils
 
 import face_alignment
 from skimage import io
 
 import cv2
-import dlib
 
-import matplotlib.pyplot as plt
-
-'''
-TODO:
-    - Finding the chin (we can try)
-    - Try to belend color, use mask color in the image and compare with the replaced face to ensure that there is no mask left
-    - Clean up code
-    - Smoothing at the seams of the mask
-    - Write report
-
-'''
 #Initalizing the models that we are going to use
 
 MASK_POINT_THRESHOLD = 5
 MASK_BOUNDING_BOX_HEIGHT_THRESHOLD = 10
 
-predictor          = "..\model\shape_predictor_68_face_landmarks.dat"
-dlib_face_detector = dlib.get_frontal_face_detector()
-facial_landmarks   = dlib.shape_predictor(predictor)
-
 #This is the model that allows us to get the facial landmark points of an image
 fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False)
-fer_detector = FER()
 
+# determines how to cover the mask in the maskless transformed image, uses canny
 def find_chin_using_canny(canny_masked_input, chin_src_pts):
     dst_pts           = []
     good_chin_src_pts = []
@@ -50,34 +32,23 @@ def find_chin_using_canny(canny_masked_input, chin_src_pts):
             dst_pts.append((r_copy, col))
             good_chin_src_pts.append((row, col))
     
-    return np.array(dst_pts, dtype=np.float32), np.array(good_chin_src_pts, dtype=np.float32)
+    return np.array(dst_pts, dtype=np.float32)
 
+#returns a vector that is the difference is distance between facial landmark point between the eyes and the chin of a person
 def find_chin(maskless_transformed_landmarks):
     x_nose, y_nose = maskless_transformed_landmarks[27]
     x_chin, y_chin = maskless_transformed_landmarks[8]
     vector = [x_chin - x_nose, y_chin - y_nose]    
-    
     return vector
 
-def determine_emotion(img):
-    fer_detector.detect_emotions(img)
-    emotion, _ = fer_detector.top_emotion(img)
-    return emotion
-
-def input_images(img_1, img_2):
-    #get the greyscale versions of our images
-    maskless_image = cv2.imread(img_1, cv2.COLOR_BGR2GRAY)  
-    masked_image = cv2.imread(img_2  , cv2.COLOR_BGR2GRAY)
-    masked_image_resized = cv2.resize(masked_image, (maskless_image.shape[1], maskless_image.shape[0]))
-
-    return maskless_image, masked_image_resized
-
-#maskless, masked = input_images("../images/maskless_dude.jpg", "../images/masked_dude.jpg")
-
-# cv2.imshow('Maskless', maskless)
-# cv2.imshow('Masked', masked)
-#find_land_marks(masked)
-
+def find_in_subdiv(pt, subdiv_points):
+    for x in range(len(subdiv_points)):
+        #print(pt, " - ", subdiv_points[x])
+        if int(subdiv_points[x][0]) == pt[0] and int(subdiv_points[x][1]) == pt[1]:
+            return x
+    
+    print("RETURNING")
+    return -1
 #reading in the images 
 masked_input = io.imread('../images/masked_dude.jpg')
 maskless_input = io.imread('../images/maskless_dude.jpg')
@@ -89,15 +60,13 @@ maskless_input = io.imread('../images/maskless_dude.jpg')
 # maskless_input = io.imread('../images/Biden_maskless.jpg')
 
 masked_output = np.copy(masked_input)
-#masked_image = cv2.imread("../images/masked_dude.jpg"  , cv2.COLOR_BGR2GRAY)
 
 masked_landmarks   = fa.get_landmarks(masked_output)
 maskless_landmarks = fa.get_landmarks(maskless_input)
 
 canny_masked_output = cv2.Canny(masked_input,100,200)
 
-print(len(masked_landmarks[0]))
-
+#Defining some variables to store our key facial landmark points
 maskless_hull_list      = []
 masked_hull_list        = []
 face_landmark_mask_size = 68
@@ -106,6 +75,7 @@ mask_dst_pts           = []
 maskless_src_pts       = []
 maskless_subdiv_points = []
 
+# collects facial landmarks for eyes and eyebrows for masked image
 count = 1
 for (x, y) in masked_landmarks[0]:
     #cv2.circle(masked_output, (int(x), int(y)), 2, (255, 0, 0), -1)
@@ -115,6 +85,7 @@ for (x, y) in masked_landmarks[0]:
         mask_dst_pts.append([int(x), int(y)])
     count = count + 1
 
+# collects the facial landmark points for eyes and eye brows of the maskless image
 count = 1
 for (x, y) in maskless_landmarks[0]:
     #cv2.circle(maskless_input, (int(x), int(y)), 2, (255, 0, 0), -1)
@@ -124,25 +95,31 @@ for (x, y) in maskless_landmarks[0]:
         maskless_src_pts.append([int(x), int(y)])
     count = count + 1
 
+# aliging the masked and maskless images so that they have the same perspective
 M, mask_useless      = cv2.findHomography(np.array(maskless_src_pts), np.array(mask_dst_pts), cv2.RANSAC, 5.0)
 warped               = cv2.warpPerspective(maskless_input, M, (masked_output.shape[1], masked_output.shape[0]))
 maskless_transformed = cv2.perspectiveTransform(np.array([maskless_landmarks[0]]), M)
 
+# correcting the homography to include an artificial/estimated chin point
+# this improves our aligning substantially
 chin_vector  = find_chin(maskless_transformed[0])
 nose_pt_mask = maskless_transformed[0][27]
-
 apprx_chin   = [int(nose_pt_mask[0] + chin_vector[0] + MASK_POINT_THRESHOLD), 
                 int(nose_pt_mask[1] + chin_vector[1])]
 
 mask_dst_pts.append(apprx_chin)
 maskless_src_pts.append((int(maskless_landmarks[0][8][0]), int(maskless_landmarks[0][8][1])))
 
+# re-computing homography with estimated chin point, improves the alignment
 M, mask_useless      = cv2.findHomography(np.array(maskless_src_pts), np.array(mask_dst_pts), cv2.RANSAC, 5.0)
 warped               = cv2.warpPerspective(maskless_input, M, (masked_output.shape[1], masked_output.shape[0]))
 maskless_transformed = cv2.perspectiveTransform(np.array([maskless_landmarks[0]]), M)
 masked_cp = np.zeros_like(masked_input)
 warped_cp = np.zeros_like(warped)
 
+
+# determining the hull list for the convex hull sorrounding our aligned maskless image
+# this hull list is later used to cut our the lower half of the maskless transformed image 
 count = 1
 for (x, y) in maskless_transformed[0]:
     pt_draw = (int(x), int(y))
@@ -169,26 +146,16 @@ for h in range(masked_output.shape[0]):
         if not(idx[h][w]):
             new_warped[h][w] = 0
 
-chin_src_pts = maskless_transformed[0][6:12]
-new_returned_dst_pts, good_chin_src_pts = find_chin_using_canny(canny_masked_output,
-                                                                chin_src_pts)
+chin_src_pts         = maskless_transformed[0][6:12]
+new_returned_dst_pts = find_chin_using_canny(canny_masked_output, chin_src_pts)
 
 # Calculate the points on the masked image for triangulation
 masked_subdiv_points = list(maskless_subdiv_points)
 count                = 1
 chin_point_counter   = 0
 
-test_pt =  (new_returned_dst_pts[0][1], 
-            new_returned_dst_pts[0][0])
-
 for (x, y) in maskless_transformed[0]:
     if (count >= 2 and count <= 16) or count == 28:
-        if count == 6: # point before we start replacing values 
-            cv2.circle(masked_cp, (int(x), int(y)), 5, (255, 255, 255), -1)
-        
-        if count == 7: # point 7 before we do the chin swap, we change this point later
-            cv2.circle(masked_cp, (int(x), int(y)), 5, (50, 50, 0), -1)
-        
         if count >= 7 and count <= 12:
             new_chin_pt = (new_returned_dst_pts[chin_point_counter][1], 
                            new_returned_dst_pts[chin_point_counter][0])
@@ -215,45 +182,32 @@ for (x, y) in new_returned_dst_pts:
     cv2.circle(canny_masked_output, pt_draw, 2, (255, 255, 255), -1)
     cv2.circle(masked_cp, pt_draw, 5, (0, 255, 0), -1)
 
-# For maskless image triangulation
+# Creating subdiv lists and triangles that are used for applying Delaunay triangulation
 maskless_rect = cv2.boundingRect(maskless_hull_list)
 cv2.rectangle(warped, (maskless_rect[0], maskless_rect[1]), (maskless_rect[0] + maskless_rect[2], maskless_rect[1] + maskless_rect[3]), (255, 0, 0), 1)
-
 maskless_subdiv = cv2.Subdiv2D(maskless_rect)
 maskless_subdiv.insert(maskless_subdiv_points)
 maskless_triangles = maskless_subdiv.getTriangleList()
 maskless_triangles = np.array(maskless_triangles, dtype=np.int32)
 
-def find_in_subdiv(pt, subdiv_points):
-    for x in range(len(subdiv_points)):
-        #print(pt, " - ", subdiv_points[x])
-        if int(subdiv_points[x][0]) == pt[0] and int(subdiv_points[x][1]) == pt[1]:
-            return x
-    
-    print("RETURNING")
-    return -1
-    
 maskless_indexes_triangles = []
-masked_indexes_triangles = []
+masked_indexes_triangles   = []
+#we needed to manually ensure that the trainglulation on the masked and maskless images matched up. 
 for triangle in maskless_triangles :
-    print("THEIR TRIANGLE", triangle)
     # Gets the vertex of the triangle
     pt1 = (triangle[0], triangle[1])
     pt2 = (triangle[2], triangle[3])
     pt3 = (triangle[4], triangle[5])
 
     idx1 = find_in_subdiv(pt1, maskless_subdiv_points)
-    print("IDX:", idx1)
     if idx1 == -1: 
         break
     
     idx2 = find_in_subdiv(pt2, maskless_subdiv_points)
-    print("IDX2:", idx2)
     if idx2 == -1:
         break
 
     idx3 = find_in_subdiv(pt3, maskless_subdiv_points)
-    print("IDX3:", idx3)
     if idx3 == -1:
         break
 
@@ -358,19 +312,12 @@ for idx in range (len(masked_indexes_triangles) - 1):
     body_new_face_rect_area = cv2.add(body_new_face_rect_area, dist_triangle)
     good_masked_output[y: y+height, x: x+width] = body_new_face_rect_area
 
+#replacing the face of the maskless input image onto the masked image
 result = masked_input.copy()
-
 for h in range(good_masked_output.shape[0]):
     for w in range(good_masked_output.shape[1]):
         if (good_masked_output[h][w][0] != 0):
             result[h][w] = good_masked_output[h][w]
-
-# body_face_mask = np.zeros_like(masked_input)
-# body_head_mask = cv2.fillConvexPoly(body_face_mask, masked_hull_list, 255)
-# body_face_mask = cv2.bitwise_not(body_head_mask)
-
-# body_maskless = cv2.bitwise_and(masked_output, masked_output, mask=body_face_mask)
-# result = cv2.add(body_maskless, good_masked_output)
 
 result = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
 
