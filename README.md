@@ -17,7 +17,7 @@ Video Demo showing the program running:  https://youtu.be/FicHZMOU6gw
                 - A number that is used for thresholding for finding the artificial chin point (Manually defaulted to 20)
 
 Examples of commands to run the code:
-python main.py 1
-python main.py 2 10
-python main.py 3
-python main.py 4 5
+* python main.py 1
+* python main.py 2 10
+* python main.py 3
+* python main.py 4 5
