@@ -1,6 +1,8 @@
-This project looks to explore the idea of performing a facemask removal from an image of a person by taking a maskless image of the person as the second input. The program uses the techniques of finding facial landmarks on a person's face, homography and warp perspective to align the maskless and masked images, then uses a convex hull to “cut out” the maskless face portion that is covered by the mask, and then uses Delaunay triangulation to perform the face swap of the images. In the end, the program produces a result image that removes the facemask from the masked image. Overall, the project works well to achieve the main goal, however, further improvements could be made for colour correction and working with images that have extreme differences in perspectives. 
+This project looks to explore the idea of performing facemask removal given an image of a person with and without a mask on.  The program uses facial landmark detection, homography, and warp perspective techniques to align the maskless and masked images. Next, it uses a convex hull to extract the lower portion of the face from both the masked and maskless image. Lastly, Delaunay triangulation is performed to swap the mask and maskless images, resulting in an output image with the facemask removed. Overall, the project works well to achieve the main goal, however, further improvements could be made for colour correction and working with images that have extreme differences in perspectives. 
 
-How to Run:
+Video Demo showing the program running:  https://youtu.be/FicHZMOU6gw
+
+How to Run: (Please refer to the video demo if the code doesn't run for you)
     1: Navigate to the /src directory.
     2. Ensure that the following pip dependancies have been installed (if not use pip install <package name from below>):
         - numpy
