@@ -2,7 +2,7 @@ This project looks to explore the idea of performing facemask removal given an i
 
 Video Demo showing the program running:  https://youtu.be/FicHZMOU6gw
 
-How to Run: (Please refer to the video demo if the code doesn't run for you)
+#How to Run: (Please refer to the video demo if the code doesn't run for you)
     1: Navigate to the /src directory.
     2. Ensure that the following pip dependancies have been installed (if not use pip install <package name from below>):
         - numpy
