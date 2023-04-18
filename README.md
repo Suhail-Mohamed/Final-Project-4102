@@ -20,4 +20,3 @@ python main.py 1
 python main.py 2 10
 python main.py 3
 python main.py 4 5
-
